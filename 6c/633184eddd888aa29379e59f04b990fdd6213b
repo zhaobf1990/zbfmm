@@ -1,0 +1,19 @@
+index.html
+  s_819f23270b4377::t_1954537dc41a32 207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "6c633184eddd888aa29379e59f04b990fdd6213b",
+  "prompts": {},
+  "sessions": {
+    "s_819f23270b4377": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7393a517-dac0-4ee4-a77f-a8795595d66c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "moyuan <moyuan@tsign.cn>"
+    }
+  }
+}
