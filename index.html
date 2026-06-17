@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="AES工具">
+  <meta name="theme-color" content="#007aff">
+  <title>AES 加解密工具</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue: #007aff;
+      --red: #ff3b30;
+      --green: #34c759;
+      --bg: #f2f2f7;
+      --card: #ffffff;
+      --text: #000000;
+      --sub: #6c6c70;
+      --border: #c6c6c8;
+      --radius: 12px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1c1e;
+        --card: #2c2c2e;
+        --text: #ffffff;
+        --sub: #98989f;
+        --border: #3a3a3c;
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 16px);
+    }
+
+    h1 {
+      font-size: 17px;
+      font-weight: 600;
+      text-align: center;
+      padding: 16px 0 20px;
+      letter-spacing: -0.3px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .card-label {
+      font-size: 13px;
+      color: var(--sub);
+      padding: 10px 16px 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    /* 模式切换 */
+    .seg {
+      display: flex;
+      background: var(--bg);
+      border-radius: 9px;
+      padding: 2px;
+      margin: 12px 12px 14px;
+    }
+    .seg button {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--sub);
+      font-size: 14px;
+      font-weight: 500;
+      padding: 7px 0;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .seg button.active {
+      background: var(--card);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    /* 文本域 */
+    input[type=password], input[type=text], input[type=search] {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 15px;
+      padding: 12px 16px;
+      outline: none;
+      height: 46px;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin-left: 16px;
+    }
+
+    /* 密码行 */
+    .pwd-row {
+      display: flex;
+      align-items: center;
+      position: relative;
+    }
+    .pwd-row input { flex: 1; }
+    .toggle-btn {
+      background: none;
+      border: none;
+      color: var(--sub);
+      font-size: 13px;
+      padding: 0 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* 操作按钮 */
+    #execBtn {
+      display: block;
+      width: 100%;
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 17px;
+      font-weight: 600;
+      padding: 14px;
+      cursor: pointer;
+      margin-bottom: 12px;
+      transition: opacity 0.2s;
+    }
+    #execBtn:disabled { opacity: 0.4; cursor: default; }
+    #execBtn:active:not(:disabled) { opacity: 0.85; }
+
+    /* 错误 */
+    #errorBox {
+      display: none;
+      background: #fff2f2;
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      color: var(--red);
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    @media (prefers-color-scheme: dark) {
+      #errorBox { background: #2d1a1a; }
+    }
+
+    /* 输出 */
+    #outputSection { display: none; }
+    #outputText {
+      color: var(--sub);
+      word-break: break-all;
+      user-select: all;
+      -webkit-user-select: all;
+    }
+    #copyBtn {
+      display: block;
+      width: calc(100% - 32px);
+      margin: 0 16px 14px;
+      background: var(--bg);
+      border: none;
+      border-radius: 8px;
+      color: var(--blue);
+      font-size: 15px;
+      font-weight: 500;
+      padding: 10px;
+      cursor: pointer;
+    }
+    #copyBtn:active { opacity: 0.7; }
+
+  </style>
+</head>
+<body>
+  <h1>AES 加解密工具</h1>
+
+  <!-- 模式选择 -->
+  <div class="card">
+    <div class="seg">
+      <button class="active" id="btnEncrypt" onclick="setMode('encrypt')">加密</button>
+      <button id="btnDecrypt" onclick="setMode('decrypt')">解密</button>
+    </div>
+  </div>
+
+  <!-- 输入内容 -->
+  <div class="card">
+    <div class="card-label" id="inputLabel">待加密内容</div>
+    <input type="text" id="inputText" placeholder="请输入内容…" autocorrect="off" autocapitalize="none" spellcheck="false">
+  </div>
+
+  <!-- 密钥 -->
+  <div class="card">
+    <div class="card-label">AES 密钥</div>
+    <div class="pwd-row">
+      <input type="password" id="password" placeholder="请输入密钥">
+      <button class="toggle-btn" onclick="togglePwd('password', this)">显示</button>
+    </div>
+  </div>
+
+  <!-- 执行按钮 -->
+  <button id="execBtn" onclick="execute()">加密</button>
+
+  <!-- 错误 -->
+  <div id="errorBox"></div>
+
+  <!-- 输出 -->
+  <div id="outputSection">
+    <div class="card">
+      <div class="card-label" id="outputLabel">加密结果</div>
+      <input type="text" id="outputText" readonly>
+    </div>
+    <button id="copyBtn" onclick="copyResult()">复制结果</button>
+  </div>
+
+  <script>
+    // ─── 状态 ───────────────────────────────────────────────
+    let mode = 'encrypt';
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('btnEncrypt').className = m === 'encrypt' ? 'active' : '';
+      document.getElementById('btnDecrypt').className = m === 'decrypt' ? 'active' : '';
+      document.getElementById('inputLabel').textContent = m === 'encrypt' ? '待加密内容' : '待解密密文';
+      document.getElementById('outputLabel').textContent = m === 'encrypt' ? '加密结果' : '解密结果';
+      document.getElementById('execBtn').textContent = m === 'encrypt' ? '加密' : '解密';
+      clearOutput();
+    }
+
+    function togglePwd(id, btn) {
+      const el = document.getElementById(id);
+      if (el.type === 'password') { el.type = 'text'; btn.textContent = '隐藏'; }
+      else { el.type = 'password'; btn.textContent = '显示'; }
+    }
+
+    function showError(msg) {
+      const box = document.getElementById('errorBox');
+      box.textContent = msg;
+      box.style.display = 'block';
+    }
+
+    function clearOutput() {
+      document.getElementById('errorBox').style.display = 'none';
+      document.getElementById('outputSection').style.display = 'none';
+      document.getElementById('outputText').value = '';
+    }
+
+    async function execute() {
+      clearOutput();
+      const input = document.getElementById('inputText').value.trim();
+      const pwd = document.getElementById('password').value.trim();
+      if (!input) return showError('请输入内容');
+      if (!pwd) return showError('请输入密钥');
+
+      try {
+        let result;
+        if (mode === 'encrypt') {
+          result = await aesEncrypt(input, pwd);
+        } else {
+          result = await aesDecrypt(input, pwd);
+        }
+        document.getElementById('outputText').value = result;
+        document.getElementById('outputSection').style.display = 'block';
+      } catch (e) {
+        showError(e.message || '操作失败，请检查输入');
+      }
+    }
+
+    async function copyResult() {
+      const text = document.getElementById('outputText').value;
+      try {
+        await navigator.clipboard.writeText(text);
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = '✓ 已复制';
+        setTimeout(() => { btn.textContent = '复制结果'; }, 2000);
+      } catch {
+        // fallback: select all
+        document.getElementById('outputText').select();
+      }
+    }
+
+    // ─── AES 加解密（与 Java AESUtil 完全兼容）────────────────
+    // 密钥派生：SHA1(password_utf8)[0..15]，等价于 Java SHA1PRNG.setSeed().nextBytes(16)
+
+    async function deriveKey(password) {
+      const enc = new TextEncoder();
+      const pwdBytes = enc.encode(password);
+      // Java SHA1PRNG: state = SHA1(password), key = SHA1(state)[0:16]
+      const state = await crypto.subtle.digest('SHA-1', pwdBytes);
+      const output = await crypto.subtle.digest('SHA-1', state);
+      const keyBytes = output.slice(0, 16);
+      return crypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['encrypt', 'decrypt']);
+    }
+
+    // AES-ECB 加密单个 16 字节块：CBC(IV=0) 输出前 16 字节即为 ECB 结果
+    async function ecbEncryptBlock(key, block16) {
+      const iv = new Uint8Array(16);
+      const enc = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, key, block16);
+      return new Uint8Array(enc).slice(0, 16);
+    }
+
+    // AES-ECB 解密单个 16 字节块
+    // 技巧：构造 [C, C_dummy] 使 PKCS7 unpadding 合法，其中
+    //   C_dummy = AES_ECB_encrypt(C XOR 0x10_block)
+    // 则 CBC 解密后第二块 = (C XOR 0x10_block) XOR C = 0x10_block（合法 PKCS7）
+    async function ecbDecryptBlock(key, block16) {
+      const iv = new Uint8Array(16);
+      const xored = block16.map(b => b ^ 0x10);
+      const dummyEnc = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, key, xored);
+      const dummy = new Uint8Array(dummyEnc).slice(0, 16);
+
+      const toDecrypt = new Uint8Array(32);
+      toDecrypt.set(block16, 0);
+      toDecrypt.set(dummy, 16);
+
+      const dec = await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, key, toDecrypt);
+      return new Uint8Array(dec); // 16 bytes（PKCS7 已去掉 dummy）
+    }
+
+    async function aesEncrypt(plaintext, password) {
+      const key = await deriveKey(password);
+      const data = new TextEncoder().encode(plaintext);
+
+      // PKCS7 padding
+      const padLen = 16 - (data.length % 16);
+      const padded = new Uint8Array(data.length + padLen);
+      padded.set(data);
+      padded.fill(padLen, data.length);
+
+      // ECB 逐块加密
+      const cipher = new Uint8Array(padded.length);
+      for (let i = 0; i < padded.length; i += 16) {
+        const encBlock = await ecbEncryptBlock(key, padded.slice(i, i + 16));
+        cipher.set(encBlock, i);
+      }
+
+      // Base64，+ 替换为 . 与 Java 保持一致
+      return btoa(String.fromCharCode(...cipher)).replace(/\+/g, '.');
+    }
+
+    async function aesDecrypt(ciphertext, password) {
+      const key = await deriveKey(password);
+      const normalized = ciphertext.replace(/\./g, '+');
+
+      let cipherBytes;
+      try {
+        cipherBytes = Uint8Array.from(atob(normalized), c => c.charCodeAt(0));
+      } catch {
+        throw new Error('Base64 解码失败，密文格式不正确');
+      }
+
+      if (cipherBytes.length === 0 || cipherBytes.length % 16 !== 0) {
+        throw new Error('密文长度不合法');
+      }
+
+      // ECB 逐块解密
+      const plain = new Uint8Array(cipherBytes.length);
+      for (let i = 0; i < cipherBytes.length; i += 16) {
+        const decBlock = await ecbDecryptBlock(key, cipherBytes.slice(i, i + 16));
+        plain.set(decBlock, i);
+      }
+
+      // 去除 PKCS7 padding
+      const padLen = plain[plain.length - 1];
+      if (padLen < 1 || padLen > 16) throw new Error('密文或密钥错误，解密失败');
+
+      return new TextDecoder().decode(plain.slice(0, plain.length - padLen));
+    }
+
+  </script>
+</body>
+</html>
