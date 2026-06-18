@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="AES工具">
   <meta name="theme-color" content="#007aff">
-  <title>AES 加解密工具</title>
+  <title>AES 加解密工具 v2</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -45,8 +45,15 @@
       font-size: 17px;
       font-weight: 600;
       text-align: center;
-      padding: 16px 0 20px;
+      padding: 16px 0 4px;
       letter-spacing: -0.3px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--sub);
+      text-align: center;
+      padding-bottom: 20px;
     }
 
     .card {
@@ -64,7 +71,6 @@
       letter-spacing: 0.3px;
     }
 
-    /* 模式切换 */
     .seg {
       display: flex;
       background: var(--bg);
@@ -85,13 +91,12 @@
       transition: all 0.2s;
     }
     .seg button.active {
-      background: var(--card);
-      color: var(--text);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+      background: var(--blue);
+      color: #ffffff;
+      box-shadow: 0 1px 4px rgba(0,122,255,0.4);
     }
 
-    /* 文本域 */
-    input[type=password], input[type=text], input[type=search] {
+    input[type=password], input[type=text] {
       width: 100%;
       border: none;
       background: transparent;
@@ -109,11 +114,9 @@
       margin-left: 16px;
     }
 
-    /* 密码行 */
     .pwd-row {
       display: flex;
       align-items: center;
-      position: relative;
     }
     .pwd-row input { flex: 1; }
     .toggle-btn {
@@ -126,7 +129,6 @@
       white-space: nowrap;
     }
 
-    /* 操作按钮 */
     #execBtn {
       display: block;
       width: 100%;
@@ -144,7 +146,6 @@
     #execBtn:disabled { opacity: 0.4; cursor: default; }
     #execBtn:active:not(:disabled) { opacity: 0.85; }
 
-    /* 错误 */
     #errorBox {
       display: none;
       background: #fff2f2;
@@ -158,7 +159,6 @@
       #errorBox { background: #2d1a1a; }
     }
 
-    /* 输出 */
     #outputSection { display: none; }
     #outputText {
       color: var(--sub);
@@ -176,21 +176,21 @@
       color: var(--blue);
       font-size: 15px;
       font-weight: 500;
-      padding: 10px;
+      padding: 16px;
       cursor: pointer;
     }
     #copyBtn:active { opacity: 0.7; }
-
   </style>
 </head>
 <body>
   <h1>AES 加解密工具</h1>
+  <p class="subtitle">PBKDF2-SHA256 · AES-256-GCM</p>
 
   <!-- 模式选择 -->
   <div class="card">
     <div class="seg">
-      <button class="active" id="btnEncrypt" onclick="setMode('encrypt')">加密</button>
-      <button id="btnDecrypt" onclick="setMode('decrypt')">解密</button>
+      <button id="btnEncrypt" onclick="setMode('encrypt')">加密</button>
+      <button class="active" id="btnDecrypt" onclick="setMode('decrypt')">解密</button>
     </div>
   </div>
 
@@ -202,9 +202,9 @@
 
   <!-- 密钥 -->
   <div class="card">
-    <div class="card-label">AES 密钥</div>
+    <div class="card-label">主密钥</div>
     <div class="pwd-row">
-      <input type="password" id="password" placeholder="请输入密钥" autocomplete="off">
+      <input type="password" id="password" placeholder="请输入主密钥" autocomplete="off">
       <button class="toggle-btn" onclick="togglePwd('password', this)">显示</button>
     </div>
   </div>
@@ -225,8 +225,7 @@
   </div>
 
   <script>
-    // ─── 状态 ───────────────────────────────────────────────
-    let mode = 'encrypt';
+    let mode = 'decrypt';
 
     function setMode(m) {
       mode = m;
@@ -256,12 +255,23 @@
       document.getElementById('outputText').value = '';
     }
 
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !document.getElementById('execBtn').disabled) execute();
+    });
+
+    // 初始化为解密模式
+    setMode('decrypt');
+
     async function execute() {
       clearOutput();
       const input = document.getElementById('inputText').value.trim();
-      const pwd = document.getElementById('password').value.trim();
+      const pwd = document.getElementById('password').value;
       if (!input) return showError('请输入内容');
-      if (!pwd) return showError('请输入密钥');
+      if (!pwd) return showError('请输入主密钥');
+
+      const btn = document.getElementById('execBtn');
+      btn.disabled = true;
+      btn.textContent = '处理中…';
 
       try {
         let result;
@@ -274,6 +284,9 @@
         document.getElementById('outputSection').style.display = 'block';
       } catch (e) {
         showError(e.message || '操作失败，请检查输入');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = mode === 'encrypt' ? '加密' : '解密';
       }
     }
 
@@ -285,99 +298,78 @@
         btn.textContent = '✓ 已复制';
         setTimeout(() => { btn.textContent = '复制结果'; }, 2000);
       } catch {
-        // fallback: select all
         document.getElementById('outputText').select();
       }
     }
 
-    // ─── AES 加解密（与 Java AESUtil 完全兼容）────────────────
-    // 密钥派生：SHA1(password_utf8)[0..15]，等价于 Java SHA1PRNG.setSeed().nextBytes(16)
-
-    async function deriveKey(password) {
-      const enc = new TextEncoder();
-      const pwdBytes = enc.encode(password);
-      // Java SHA1PRNG: state = SHA1(password), key = SHA1(state)[0:16]
-      const state = await crypto.subtle.digest('SHA-1', pwdBytes);
-      const output = await crypto.subtle.digest('SHA-1', state);
-      const keyBytes = output.slice(0, 16);
-      return crypto.subtle.importKey('raw', keyBytes, { name: 'AES-CBC' }, false, ['encrypt', 'decrypt']);
+    // ─── 密钥派生：PBKDF2-SHA256，600,000 次迭代 ────────────────────────
+    async function deriveKey(password, salt) {
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(password),
+        'PBKDF2',
+        false,
+        ['deriveKey']
+      );
+      return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
     }
 
-    // AES-ECB 加密单个 16 字节块：CBC(IV=0) 输出前 16 字节即为 ECB 结果
-    async function ecbEncryptBlock(key, block16) {
-      const iv = new Uint8Array(16);
-      const enc = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, key, block16);
-      return new Uint8Array(enc).slice(0, 16);
-    }
-
-    // AES-ECB 解密单个 16 字节块
-    // 技巧：构造 [C, C_dummy] 使 PKCS7 unpadding 合法，其中
-    //   C_dummy = AES_ECB_encrypt(C XOR 0x10_block)
-    // 则 CBC 解密后第二块 = (C XOR 0x10_block) XOR C = 0x10_block（合法 PKCS7）
-    async function ecbDecryptBlock(key, block16) {
-      const iv = new Uint8Array(16);
-      const xored = block16.map(b => b ^ 0x10);
-      const dummyEnc = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, key, xored);
-      const dummy = new Uint8Array(dummyEnc).slice(0, 16);
-
-      const toDecrypt = new Uint8Array(32);
-      toDecrypt.set(block16, 0);
-      toDecrypt.set(dummy, 16);
-
-      const dec = await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, key, toDecrypt);
-      return new Uint8Array(dec); // 16 bytes（PKCS7 已去掉 dummy）
-    }
-
+    // ─── 加密：输出 Base64(salt[16] + iv[12] + ciphertext+tag) ──────────
     async function aesEncrypt(plaintext, password) {
-      const key = await deriveKey(password);
-      const data = new TextEncoder().encode(plaintext);
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv   = crypto.getRandomValues(new Uint8Array(12));
+      const key  = await deriveKey(password, salt);
 
-      // PKCS7 padding
-      const padLen = 16 - (data.length % 16);
-      const padded = new Uint8Array(data.length + padLen);
-      padded.set(data);
-      padded.fill(padLen, data.length);
+      const cipherBuf = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        new TextEncoder().encode(plaintext)
+      );
 
-      // ECB 逐块加密
-      const cipher = new Uint8Array(padded.length);
-      for (let i = 0; i < padded.length; i += 16) {
-        const encBlock = await ecbEncryptBlock(key, padded.slice(i, i + 16));
-        cipher.set(encBlock, i);
-      }
+      const out = new Uint8Array(16 + 12 + cipherBuf.byteLength);
+      out.set(salt, 0);
+      out.set(iv, 16);
+      out.set(new Uint8Array(cipherBuf), 28);
 
-      // Base64，+ 替换为 . 与 Java 保持一致
-      return btoa(String.fromCharCode(...cipher)).replace(/\+/g, '.');
+      return btoa(String.fromCharCode(...out));
     }
 
+    // ─── 解密：从 Base64 中拆出 salt/iv，还原密钥后解密 ─────────────────
     async function aesDecrypt(ciphertext, password) {
-      const key = await deriveKey(password);
-      const normalized = ciphertext.replace(/\./g, '+');
-
-      let cipherBytes;
+      let bytes;
       try {
-        cipherBytes = Uint8Array.from(atob(normalized), c => c.charCodeAt(0));
+        bytes = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
       } catch {
         throw new Error('Base64 解码失败，密文格式不正确');
       }
 
-      if (cipherBytes.length === 0 || cipherBytes.length % 16 !== 0) {
+      // 最小长度：salt(16) + iv(12) + GCM tag(16) = 44 字节
+      if (bytes.length < 44) {
         throw new Error('密文长度不合法');
       }
 
-      // ECB 逐块解密
-      const plain = new Uint8Array(cipherBytes.length);
-      for (let i = 0; i < cipherBytes.length; i += 16) {
-        const decBlock = await ecbDecryptBlock(key, cipherBytes.slice(i, i + 16));
-        plain.set(decBlock, i);
+      const salt = bytes.slice(0, 16);
+      const iv   = bytes.slice(16, 28);
+      const data = bytes.slice(28);
+      const key  = await deriveKey(password, salt);
+
+      try {
+        const plainBuf = await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv },
+          key,
+          data
+        );
+        return new TextDecoder().decode(plainBuf);
+      } catch {
+        throw new Error('解密失败：密钥错误或密文已损坏');
       }
-
-      // 去除 PKCS7 padding
-      const padLen = plain[plain.length - 1];
-      if (padLen < 1 || padLen > 16) throw new Error('密文或密钥错误，解密失败');
-
-      return new TextDecoder().decode(plain.slice(0, plain.length - padLen));
     }
-
   </script>
 </body>
 </html>
