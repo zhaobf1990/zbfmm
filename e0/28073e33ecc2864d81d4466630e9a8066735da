@@ -1,0 +1,19 @@
+README.md
+  s_454640d1e2e51d::t_95874086adf77e 1-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "e028073e33ecc2864d81d4466630e9a8066735da",
+  "prompts": {},
+  "sessions": {
+    "s_454640d1e2e51d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "94a81e96-852d-4a6c-a731-89df5a4303fd",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "moyuan <moyuan@tsign.cn>"
+    }
+  }
+}
